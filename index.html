@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker Networking Deep Dive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<style>
+  :root {
+    --amber:  #f5a623;
+    --green:  #4ecb8d;
+    --purple: #a78bfa;
+    --blue:   #60a5fa;
+    --red:    #f87171;
+    --bg:     #0a0a0f;
+    --bg2:    #10101a;
+    --bg3:    #181824;
+    --border: #2a2a3a;
+    --text:   #e8e8f0;
+    --muted:  #8888a8;
+  }
+
+  .reveal-viewport { background: var(--bg); }
+  .reveal .slides section { background: transparent; }
+
+  .reveal { font-family: 'DM Sans', sans-serif; color: var(--text); }
+  .reveal h1, .reveal h2, .reveal h3 { font-family: 'Playfair Display', serif; font-weight: 700; }
+  .reveal h1 { font-size: 1.6em; color: var(--amber); line-height: 1.1; }
+  .reveal h2 { font-size: 1.1em; color: var(--amber); margin-bottom: .2em; }
+  .reveal h3 { font-size: .78em; color: var(--green); margin-bottom: .15em; }
+  .reveal p  { font-size: .56em; line-height: 1.45; color: var(--text); }
+  .reveal li { font-size: .54em; line-height: 1.45; margin-bottom: .1em; }
+  .reveal code { font-family: 'JetBrains Mono', monospace; font-size: .72em; }
+  .reveal pre  { box-shadow: none; background: var(--bg3); border: 1px solid var(--border);
+                 border-radius: 6px; padding: .3em .5em; margin: .25em 0; }
+  .reveal pre code { font-size: .52em; line-height: 1.35; background: transparent; color: #cdd6f4; }
+
+  .slide-hdr {
+    display: flex; align-items: center; gap: .4em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: .2em; margin-bottom: .3em;
+  }
+  .slide-hdr .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .42em; font-weight: 500;
+    color: var(--bg); background: var(--amber);
+    padding: .1em .4em; border-radius: 3px;
+    letter-spacing: .04em;
+  }
+  .slide-hdr h2 { margin: 0; font-size: .95em; }
+
+  .cols   { display: grid; gap: .5em; }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .cols-6040 { grid-template-columns: 6fr 4fr; }
+  .cols-4060 { grid-template-columns: 4fr 6fr; }
+
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 6px; padding: .35em .6em;
+  }
+  .card.amber { border-left: 3px solid var(--amber); }
+  .card.green { border-left: 3px solid var(--green); }
+  .card.purple{ border-left: 3px solid var(--purple); }
+  .card.blue  { border-left: 3px solid var(--blue); }
+  .card.red   { border-left: 3px solid var(--red); }
+  .card h3 { font-size: .64em; margin: 0 0 .12em; }
+  .card p  { font-size: .52em; margin: 0; color: #b8b8d0; }
+  .card ul { margin: 0; padding-left: 1em; }
+  .card li { font-size: .52em; color: #b8b8d0; margin-bottom: .02em; }
+
+  .reveal table { width: 100%; border-collapse: collapse; font-size: .5em; }
+  .reveal table th { background: var(--bg3); color: var(--amber); font-weight: 600;
+                     padding: .2em .4em; border: 1px solid var(--border); text-align: left; }
+  .reveal table td { padding: .18em .4em; border: 1px solid var(--border); color: #ccc; }
+  .reveal table tr:nth-child(even) td { background: #0e0e18; }
+
+  .a  { color: var(--amber); font-weight: 600; }
+  .g  { color: var(--green); font-weight: 600; }
+  .p  { color: var(--purple); font-weight: 600; }
+  .b  { color: var(--blue); font-weight: 600; }
+  .r  { color: var(--red); font-weight: 600; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  svg.diagram { display: block; margin: 0 auto; overflow: visible; }
+
+  .pill {
+    display: inline-block; font-family: 'JetBrains Mono', monospace;
+    font-size: .44em; padding: .08em .4em; border-radius: 99px;
+    border: 1px solid; margin: 0 .08em;
+  }
+  .pill.amber { color: var(--amber); border-color: var(--amber); }
+  .pill.green { color: var(--green); border-color: var(--green); }
+  .pill.purple{ color: var(--purple); border-color: var(--purple); }
+  .pill.blue  { color: var(--blue); border-color: var(--blue); }
+
+  .reveal .slide-footer { display: none; }
+  .title-slide h1 { font-size: 1.8em; }
+  .title-slide .subtitle {
+    font-size: .7em; color: var(--green); font-family: 'DM Sans', sans-serif;
+    font-weight: 300; letter-spacing: .04em; margin: .3em 0 .6em;
+  }
+  .title-slide .meta { font-size: .48em; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  .ss-row {
+    display: flex; gap: .25em; align-items: center;
+    margin: .1em 0; font-size: .55em; font-family: 'JetBrains Mono', monospace;
+  }
+  .ss-node {
+    padding: .2em .55em; border-radius: 5px; font-size: .9em;
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  }
+  .ss-node.active { background: #1a2a1a; border-color: var(--green); color: var(--green); }
+  .ss-node.done   { background: #1a1a2a; border-color: var(--purple); color: var(--purple); }
+  .ss-arrow { color: var(--amber); }
+  .ss-label { font-size: .8em; color: var(--muted); margin-left: .3em; }
+
+  .reveal ul, .reveal ol { margin: .15em 0 .15em 1em; }
+  .reveal .slides > section { display: flex !important; flex-direction: column !important; overflow-y: auto !important; align-items: stretch !important; justify-content: flex-start !important; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+
+<!-- ═══════════════════════════════ SLIDE 01 — TITLE ═══════════════════════════════ -->
+<section class="title-slide" data-background-color="#0a0a0f">
+  <div style="text-align:left; max-width:820px; margin:0 auto; padding: 1em 0;">
+    <div style="font-family:'JetBrains Mono',monospace; font-size:.5em; color:var(--muted); margin-bottom:.4em; letter-spacing:.1em;">
+      TECHNICAL PRESENTATION
+    </div>
+    <h1>Docker Networking<br>Deep Dive</h1>
+    <div class="subtitle">Connecting Containers to the World</div>
+    <div style="width:60px; height:3px; background:var(--amber); margin-bottom:1.4em;"></div>
+    <div style="display:flex; gap:1.2em; flex-wrap:wrap; margin-bottom:1em;">
+      <span class="pill amber">Networking</span>
+      <span class="pill green">Bridge</span>
+      <span class="pill purple">Overlay</span>
+      <span class="pill blue">DNS</span>
+    </div>
+    <div class="ss-row" style="margin-top:0.6em;">
+      <span class="ss-node active">Container</span>
+      <span class="ss-arrow">&rarr;</span>
+      <span class="ss-node active">veth</span>
+      <span class="ss-arrow">&rarr;</span>
+      <span class="ss-node active">Bridge</span>
+      <span class="ss-arrow">&rarr;</span>
+      <span class="ss-node done">iptables</span>
+      <span class="ss-arrow">&rarr;</span>
+      <span class="ss-node done">Host NIC</span>
+    </div>
+    <p style="max-width:620px; color:#a0a0c0; font-size:.56em; line-height:1.5; margin-top:1em;">
+      Understanding how Docker containers communicate &mdash; with each other, the host, and the outside world &mdash; through bridges, overlays, DNS, and network policies.
+    </p>
+    <div class="meta" style="margin-top:1.4em;">
+      Bridge &nbsp;&middot;&nbsp; Host &nbsp;&middot;&nbsp; Overlay &nbsp;&middot;&nbsp; Macvlan &nbsp;&middot;&nbsp; Security
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 02 — TOPICS ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">01</span>
+    <h2>Topics</h2>
+  </div>
+  <div class="cols cols-2">
+    <div>
+      <div class="card amber">
+        <h3 class="a">Network Drivers</h3>
+        <ul>
+          <li>Bridge networks (default &amp; user-defined)</li>
+          <li>Host networking</li>
+          <li>Overlay networks (Swarm / multi-host)</li>
+          <li>Macvlan &amp; IPvlan drivers</li>
+        </ul>
+      </div>
+      <div class="card green" style="margin-top:0.5em;">
+        <h3 class="g">Communication &amp; DNS</h3>
+        <ul>
+          <li>Container-to-container communication</li>
+          <li>Docker embedded DNS server</li>
+          <li>Port mapping &amp; publishing</li>
+          <li>Service discovery patterns</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card purple">
+        <h3 class="p">Security &amp; Isolation</h3>
+        <ul>
+          <li>Network isolation fundamentals</li>
+          <li>Inter-container firewall rules</li>
+          <li>Encrypting overlay traffic</li>
+          <li>Network policies &amp; best practices</li>
+        </ul>
+      </div>
+      <div class="card blue" style="margin-top:0.5em;">
+        <h3 class="b">Operations &amp; Production</h3>
+        <ul>
+          <li>Network commands cheat sheet</li>
+          <li>Troubleshooting techniques</li>
+          <li>Network plugins &amp; CNI</li>
+          <li>Production networking patterns</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 03 — NETWORKING OVERVIEW ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">02</span>
+    <h2>Docker Networking Overview</h2>
+  </div>
+  <p>Docker uses a pluggable networking architecture built on top of Linux kernel primitives. Every container gets its own <span class="b">network namespace</span>, with virtual ethernet pairs connecting it to a network driver.</p>
+  <div class="cols cols-3" style="margin-top:0.3em;">
+    <div class="card amber">
+      <h3 class="a">Network Namespace</h3>
+      <p>Each container has an isolated network stack: its own interfaces, routing table, iptables rules, and /proc/net entries.</p>
+    </div>
+    <div class="card green">
+      <h3 class="g">veth Pairs</h3>
+      <p>Virtual ethernet device pairs act as tunnels between the container namespace and the host/bridge namespace.</p>
+    </div>
+    <div class="card purple">
+      <h3 class="p">Network Drivers</h3>
+      <p>Pluggable drivers (bridge, host, overlay, macvlan, none) determine how traffic is routed and isolated.</p>
+    </div>
+  </div>
+  <div class="ss-row" style="margin-top:0.5em;">
+    <span class="ss-node active">Container eth0</span>
+    <span class="ss-arrow">&rarr;</span>
+    <span class="ss-node">veth pair</span>
+    <span class="ss-arrow">&rarr;</span>
+    <span class="ss-node active">docker0 bridge</span>
+    <span class="ss-arrow">&rarr;</span>
+    <span class="ss-node done">iptables NAT</span>
+    <span class="ss-arrow">&rarr;</span>
+    <span class="ss-node done">eth0 (host)</span>
+  </div>
+  <pre><code class="language-bash"># List all Docker networks
+docker network ls
+
+# Output:
+# NETWORK ID     NAME      DRIVER    SCOPE
+# a1b2c3d4e5f6   bridge    bridge    local
+# f6e5d4c3b2a1   host      host      local
+# 9a8b7c6d5e4f   none      null      local</code></pre>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 04 — DEFAULT BRIDGE ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">03</span>
+    <h2>Default Bridge Network</h2>
+  </div>
+  <p>Every Docker installation creates a default <code>bridge</code> network (the <span class="a">docker0</span> interface). Containers connect here automatically unless you specify otherwise.</p>
+  <div class="cols cols-2">
+    <div>
+      <div class="card amber">
+        <h3 class="a">How It Works</h3>
+        <ul>
+          <li>Linux bridge <code>docker0</code> created at daemon start</li>
+          <li>Default subnet: <code>172.17.0.0/16</code></li>
+          <li>Containers get IPs via IPAM (172.17.0.x)</li>
+          <li>Host acts as gateway at <code>172.17.0.1</code></li>
+          <li>NAT via iptables for outbound traffic</li>
+        </ul>
+      </div>
+      <div class="card red" style="margin-top:0.4em;">
+        <h3 class="r">Limitations</h3>
+        <ul>
+          <li>No automatic DNS resolution between containers</li>
+          <li>Must use <code>--link</code> (deprecated) or IP addresses</li>
+          <li>All containers share one bridge &mdash; no isolation</li>
+          <li>Cannot be used with Docker Compose service names</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <pre><code class="language-bash"># Run a container on the default bridge
+docker run -d --name web nginx
+
+# Inspect the network
+docker network inspect bridge
+
+# Check the container's IP
+docker inspect -f \
+  '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+  web
+# 172.17.0.2
+
+# Containers can ping by IP (not name)
+docker exec web ping 172.17.0.3</code></pre>
+      <pre><code class="language-bash"># View the bridge on the host
+ip addr show docker0
+# docker0: &lt;BROADCAST,MULTICAST,UP&gt;
+#   inet 172.17.0.1/16 scope global docker0
+
+brctl show docker0
+# bridge    interfaces
+# docker0   veth3a1b2c</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 05 — USER-DEFINED BRIDGE ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">04</span>
+    <h2>User-Defined Bridge Networks</h2>
+  </div>
+  <p><span class="g">User-defined bridges</span> are the recommended way to run containers. They provide automatic DNS, better isolation, and can be connected/disconnected on the fly.</p>
+  <div class="cols cols-6040">
+    <div>
+      <div class="card green">
+        <h3 class="g">Advantages over Default Bridge</h3>
+        <ul>
+          <li><strong>Automatic DNS:</strong> containers resolve each other by name</li>
+          <li><strong>Better isolation:</strong> only containers on the same network communicate</li>
+          <li><strong>Hot-pluggable:</strong> connect/disconnect containers without restart</li>
+          <li><strong>Custom subnets:</strong> define your own IP ranges and gateways</li>
+          <li><strong>Per-network config:</strong> MTU, driver options, labels</li>
+        </ul>
+      </div>
+      <pre><code class="language-yaml"># docker-compose.yml (automatic user-defined bridge)
+services:
+  web:
+    image: nginx
+    networks: [frontend]
+  api:
+    image: node:20
+    networks: [frontend, backend]
+  db:
+    image: postgres:16
+    networks: [backend]
+
+networks:
+  frontend:
+  backend:</code></pre>
+    </div>
+    <div>
+      <pre><code class="language-bash"># Create a user-defined bridge
+docker network create my-app
+
+# Run containers on it
+docker run -d --name api \
+  --network my-app node:20
+
+docker run -d --name db \
+  --network my-app postgres:16
+
+# DNS works automatically!
+docker exec api ping db
+# PING db (172.18.0.3): 56 bytes
+
+# Connect a running container
+docker network connect my-app web
+
+# Disconnect
+docker network disconnect my-app web</code></pre>
+      <pre><code class="language-bash"># Custom subnet and gateway
+docker network create \
+  --subnet 10.10.0.0/24 \
+  --gateway 10.10.0.1 \
+  --ip-range 10.10.0.128/25 \
+  my-custom-net</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 06 — HOST NETWORKING ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">05</span>
+    <h2>Host Networking</h2>
+  </div>
+  <p>With <code>--network host</code>, the container shares the host&rsquo;s network namespace directly. No network isolation, no NAT &mdash; the container <span class="a">is</span> the host from a networking perspective.</p>
+  <div class="cols cols-2">
+    <div>
+      <div class="card amber">
+        <h3 class="a">When to Use Host Mode</h3>
+        <ul>
+          <li>Performance-critical apps (eliminates NAT overhead)</li>
+          <li>Applications binding to many dynamic ports</li>
+          <li>Network monitoring / packet capture tools</li>
+          <li>Legacy apps that must bind to specific host interfaces</li>
+        </ul>
+      </div>
+      <div class="card red" style="margin-top:0.4em;">
+        <h3 class="r">Drawbacks</h3>
+        <ul>
+          <li>No port isolation &mdash; port conflicts between containers</li>
+          <li>Reduced security (full host network access)</li>
+          <li>Only works on Linux (not Docker Desktop Mac/Win)</li>
+          <li>Cannot use port mapping (<code>-p</code> flag is ignored)</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <pre><code class="language-bash"># Run with host networking
+docker run -d --network host --name monitor \
+  nicolaka/netshoot
+
+# The container sees all host interfaces
+docker exec monitor ip addr
+# 1: lo ...
+# 2: eth0: 192.168.1.100/24
+# 3: docker0: 172.17.0.1/16
+
+# nginx on host mode binds directly to port 80
+docker run -d --network host nginx
+curl http://localhost:80  # Works!</code></pre>
+      <pre><code class="language-yaml"># docker-compose.yml
+services:
+  prometheus:
+    image: prom/prometheus
+    network_mode: host
+    # No ports: mapping needed</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 07 — OVERLAY NETWORKS ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">06</span>
+    <h2>Overlay Networks</h2>
+  </div>
+  <p>Overlay networks enable <span class="p">multi-host communication</span> by encapsulating container traffic in VXLAN tunnels. Essential for Docker Swarm and multi-node deployments.</p>
+  <div class="cols cols-2">
+    <div>
+      <div class="card purple">
+        <h3 class="p">How Overlay Works</h3>
+        <ul>
+          <li>Uses VXLAN encapsulation (UDP port 4789)</li>
+          <li>Creates a distributed virtual network across hosts</li>
+          <li>Each node gets a VTEP (VXLAN Tunnel Endpoint)</li>
+          <li>Built-in service discovery and load balancing</li>
+          <li>Optional IPsec encryption with <code>--opt encrypted</code></li>
+        </ul>
+      </div>
+      <div class="card blue" style="margin-top:0.4em;">
+        <h3 class="b">Requirements</h3>
+        <ul>
+          <li>Docker Swarm mode initialised (<code>docker swarm init</code>)</li>
+          <li>Ports 2377 (mgmt), 7946 (gossip), 4789 (VXLAN) open</li>
+          <li>All nodes must be able to reach each other</li>
+          <li>Use <code>--attachable</code> for standalone container access</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <pre><code class="language-bash"># Initialise Swarm
+docker swarm init --advertise-addr 10.0.1.10
+
+# Create an overlay network
+docker network create \
+  --driver overlay \
+  --attachable \
+  --opt encrypted \
+  my-overlay
+
+# Deploy a service across nodes
+docker service create \
+  --name web \
+  --network my-overlay \
+  --replicas 3 \
+  nginx
+
+# Standalone container on overlay
+docker run -d --network my-overlay \
+  --name debug nicolaka/netshoot</code></pre>
+      <div class="ss-row" style="margin-top:0.3em;">
+        <span class="ss-node active">Node 1</span>
+        <span class="ss-arrow">&harr;</span>
+        <span class="ss-node">VXLAN Tunnel</span>
+        <span class="ss-arrow">&harr;</span>
+        <span class="ss-node active">Node 2</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 08 — MACVLAN & IPVLAN ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">07</span>
+    <h2>Macvlan &amp; IPvlan Drivers</h2>
+  </div>
+  <p>These drivers assign <span class="g">real IP addresses</span> from the physical network to containers, making them appear as physical hosts on the LAN. No NAT, no bridge.</p>
+  <div class="cols cols-2">
+    <div>
+      <div class="card green">
+        <h3 class="g">Macvlan</h3>
+        <ul>
+          <li>Each container gets its own MAC address</li>
+          <li>Appears as a distinct physical device on the network</li>
+          <li>Requires the host NIC in promiscuous mode</li>
+          <li>Best for: legacy apps needing direct LAN access</li>
+          <li>Supports 802.1Q VLAN trunking</li>
+        </ul>
+      </div>
+      <pre><code class="language-bash"># Create a macvlan network
+docker network create -d macvlan \
+  --subnet 192.168.1.0/24 \
+  --gateway 192.168.1.1 \
+  -o parent=eth0 \
+  my-macvlan
+
+# Run container with LAN IP
+docker run -d --network my-macvlan \
+  --ip 192.168.1.50 \
+  --name lan-server nginx</code></pre>
+    </div>
+    <div>
+      <div class="card blue">
+        <h3 class="b">IPvlan</h3>
+        <ul>
+          <li>Containers share the parent&rsquo;s MAC address</li>
+          <li>L2 mode: same subnet, like macvlan but single MAC</li>
+          <li>L3 mode: routed, each container a separate subnet</li>
+          <li>Works where promiscuous mode is blocked (cloud VMs)</li>
+          <li>Lower overhead than macvlan</li>
+        </ul>
+      </div>
+      <pre><code class="language-bash"># IPvlan L2 mode
+docker network create -d ipvlan \
+  --subnet 192.168.1.0/24 \
+  --gateway 192.168.1.1 \
+  -o parent=eth0 \
+  -o ipvlan_mode=l2 \
+  my-ipvlan
+
+# IPvlan L3 mode (routed)
+docker network create -d ipvlan \
+  --subnet 10.10.0.0/24 \
+  -o parent=eth0 \
+  -o ipvlan_mode=l3 \
+  my-ipvlan-l3</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 09 — NETWORK DRIVER COMPARISON ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">08</span>
+    <h2>Network Driver Comparison</h2>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Driver</th>
+        <th>Scope</th>
+        <th>Container IP</th>
+        <th>DNS</th>
+        <th>Isolation</th>
+        <th>Best For</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="a">bridge</span> (default)</td>
+        <td>Single host</td>
+        <td>Private (172.17.x.x)</td>
+        <td>No</td>
+        <td>Low</td>
+        <td>Quick testing</td>
+      </tr>
+      <tr>
+        <td><span class="g">bridge</span> (user-defined)</td>
+        <td>Single host</td>
+        <td>Private (custom)</td>
+        <td>Yes</td>
+        <td>Medium</td>
+        <td>Most workloads</td>
+      </tr>
+      <tr>
+        <td><span class="b">host</span></td>
+        <td>Single host</td>
+        <td>Host IP</td>
+        <td>Host</td>
+        <td>None</td>
+        <td>Performance, monitoring</td>
+      </tr>
+      <tr>
+        <td><span class="p">overlay</span></td>
+        <td>Multi-host</td>
+        <td>Private (10.0.x.x)</td>
+        <td>Yes</td>
+        <td>High</td>
+        <td>Swarm services</td>
+      </tr>
+      <tr>
+        <td><span class="g">macvlan</span></td>
+        <td>Single host</td>
+        <td>LAN IP (unique MAC)</td>
+        <td>No</td>
+        <td>High</td>
+        <td>LAN-direct access</td>
+      </tr>
+      <tr>
+        <td><span class="b">ipvlan</span></td>
+        <td>Single host</td>
+        <td>LAN IP (shared MAC)</td>
+        <td>No</td>
+        <td>High</td>
+        <td>Cloud VMs, L3 routing</td>
+      </tr>
+      <tr>
+        <td><span class="r">none</span></td>
+        <td>Single host</td>
+        <td>None</td>
+        <td>No</td>
+        <td>Complete</td>
+        <td>Batch jobs, security</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="card amber" style="margin-top:0.4em;">
+    <p><strong>Rule of thumb:</strong> Use <span class="g">user-defined bridges</span> for single-host apps, <span class="p">overlay</span> for multi-host, and <span class="a">host</span> only when you need raw performance or host-level network access.</p>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 10 — DNS RESOLUTION ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">09</span>
+    <h2>DNS Resolution in Docker</h2>
+  </div>
+  <p>Docker runs an <span class="b">embedded DNS server</span> at <code>127.0.0.11</code> inside every user-defined network. This enables automatic service discovery by container name.</p>
+  <div class="cols cols-2">
+    <div>
+      <div class="card blue">
+        <h3 class="b">How Docker DNS Works</h3>
+        <ul>
+          <li>Embedded DNS at <code>127.0.0.11:53</code></li>
+          <li>Resolves container names &rarr; IP addresses</li>
+          <li>Resolves network aliases and service names</li>
+          <li>Falls back to host DNS for external domains</li>
+          <li><strong>Only works on user-defined networks</strong></li>
+        </ul>
+      </div>
+      <div class="card green" style="margin-top:0.4em;">
+        <h3 class="g">Network Aliases</h3>
+        <ul>
+          <li>Multiple containers can share an alias</li>
+          <li>Docker round-robins DNS responses</li>
+          <li>Useful for simple load balancing</li>
+        </ul>
+      </div>
+      <pre><code class="language-bash"># Network aliases for round-robin
+docker run -d --network my-app \
+  --network-alias api worker1
+docker run -d --network my-app \
+  --network-alias api worker2
+# "api" resolves to both IPs</code></pre>
+    </div>
+    <div>
+      <pre><code class="language-bash"># DNS in action
+docker network create app-net
+
+docker run -d --name db \
+  --network app-net postgres:16
+
+docker run -d --name api \
+  --network app-net node:20
+
+# Automatic resolution
+docker exec api nslookup db
+# Server:  127.0.0.11
+# Name:    db
+# Address: 172.19.0.2
+
+docker exec api ping db
+# PING db (172.19.0.2): 56 bytes</code></pre>
+      <pre><code class="language-bash"># Custom DNS configuration
+docker run -d \
+  --dns 8.8.8.8 \
+  --dns-search example.com \
+  --hostname myapp.local \
+  --name api my-image</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 11 — PORT MAPPING ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">10</span>
+    <h2>Port Mapping &amp; Publishing</h2>
+  </div>
+  <p>Port mapping uses <span class="a">iptables DNAT rules</span> to forward traffic from a host port to a container port. This is how external clients reach containerised services.</p>
+  <div class="cols cols-2">
+    <div>
+      <table>
+        <thead>
+          <tr><th>Flag</th><th>Meaning</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>-p 8080:80</code></td><td>Host 8080 &rarr; Container 80</td><td>All interfaces</td></tr>
+          <tr><td><code>-p 127.0.0.1:8080:80</code></td><td>Localhost only</td><td>Dev safety</td></tr>
+          <tr><td><code>-p 8080:80/udp</code></td><td>UDP protocol</td><td>DNS, QUIC</td></tr>
+          <tr><td><code>-p 8080-8090:80-90</code></td><td>Port range</td><td>Multi-port apps</td></tr>
+          <tr><td><code>-P</code></td><td>Publish all EXPOSE</td><td>Random host ports</td></tr>
+        </tbody>
+      </table>
+      <div class="card red" style="margin-top:0.4em;">
+        <h3 class="r">Security Warning</h3>
+        <p>Docker port mappings <strong>bypass UFW/firewalld</strong> by default. Use <code>127.0.0.1:</code> binding or configure <code>DOCKER_IPTABLES=false</code> and manage rules manually.</p>
+      </div>
+    </div>
+    <div>
+      <pre><code class="language-bash"># Basic port mapping
+docker run -d -p 8080:80 nginx
+
+# Bind to localhost only (secure)
+docker run -d -p 127.0.0.1:3000:3000 \
+  my-api
+
+# Multiple port mappings
+docker run -d \
+  -p 80:80 \
+  -p 443:443 \
+  -p 127.0.0.1:8443:8443 \
+  my-proxy
+
+# Check published ports
+docker port my-proxy
+# 80/tcp  -> 0.0.0.0:80
+# 443/tcp -> 0.0.0.0:443
+# 8443/tcp -> 127.0.0.1:8443</code></pre>
+      <pre><code class="language-yaml"># docker-compose.yml
+services:
+  web:
+    image: nginx
+    ports:
+      - "80:80"
+      - "127.0.0.1:8080:8080"</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 12 — CONTAINER-TO-CONTAINER ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">11</span>
+    <h2>Container-to-Container Communication</h2>
+  </div>
+  <p>Containers on the <span class="g">same user-defined network</span> can communicate freely using container names. Cross-network communication requires connecting containers to multiple networks.</p>
+  <div class="cols cols-2">
+    <div>
+      <div class="card green">
+        <h3 class="g">Same Network</h3>
+        <ul>
+          <li>Direct communication via container name</li>
+          <li>No port publishing needed</li>
+          <li>All ports are accessible between containers</li>
+          <li>Uses Docker&rsquo;s embedded DNS</li>
+        </ul>
+      </div>
+      <div class="card purple" style="margin-top:0.4em;">
+        <h3 class="p">Cross-Network Communication</h3>
+        <ul>
+          <li>Containers on different networks are isolated</li>
+          <li>Connect container to multiple networks</li>
+          <li>Use a &ldquo;gateway&rdquo; container on both networks</li>
+          <li>Or route via published ports on the host</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <pre><code class="language-yaml"># Multi-network Compose pattern
+services:
+  nginx:
+    image: nginx
+    networks: [frontend]
+    ports: ["80:80"]
+
+  api:
+    image: node:20
+    networks: [frontend, backend]
+    # api talks to both nginx and db
+
+  db:
+    image: postgres:16
+    networks: [backend]
+    # db is isolated from nginx
+
+networks:
+  frontend:
+    name: app-frontend
+  backend:
+    name: app-backend
+    internal: true  # No external access</code></pre>
+      <div class="ss-row" style="margin-top:0.3em;">
+        <span class="ss-node active">nginx</span>
+        <span class="ss-arrow">&harr;</span>
+        <span class="ss-node done">api</span>
+        <span class="ss-arrow">&harr;</span>
+        <span class="ss-node active">db</span>
+      </div>
+      <p style="font-size:0.46em; color:var(--muted); text-align:center;">frontend &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; backend (internal)</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 13 — NETWORK ISOLATION ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">12</span>
+    <h2>Network Isolation &amp; Security</h2>
+  </div>
+  <div class="cols cols-2">
+    <div>
+      <div class="card amber">
+        <h3 class="a">Isolation Strategies</h3>
+        <ul>
+          <li><strong>Separate networks:</strong> each tier on its own network</li>
+          <li><strong>Internal networks:</strong> <code>--internal</code> blocks external access</li>
+          <li><strong>No network:</strong> <code>--network none</code> for complete isolation</li>
+          <li><strong>ICC:</strong> disable inter-container communication on bridge</li>
+          <li><strong>Read-only:</strong> combine with read-only filesystem</li>
+        </ul>
+      </div>
+      <div class="card red" style="margin-top:0.4em;">
+        <h3 class="r">Common Mistakes</h3>
+        <ul>
+          <li>Running everything on the default bridge</li>
+          <li>Exposing database ports to <code>0.0.0.0</code></li>
+          <li>Not using internal networks for backends</li>
+          <li>Ignoring Docker&rsquo;s iptables bypass of host firewall</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <pre><code class="language-bash"># Internal network (no external access)
+docker network create --internal backend
+
+# Disable inter-container communication
+dockerd --icc=false
+
+# No network at all
+docker run --network none alpine
+
+# Encrypt overlay traffic
+docker network create --driver overlay \
+  --opt encrypted secure-overlay</code></pre>
+      <pre><code class="language-bash"># Restrict daemon-level networking
+# /etc/docker/daemon.json
+{
+  "icc": false,
+  "iptables": true,
+  "default-address-pools": [
+    {"base": "10.10.0.0/16", "size": 24}
+  ]
+}</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 14 — NETWORK COMMANDS ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">13</span>
+    <h2>Network Commands Cheat Sheet</h2>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Command</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>docker network ls</code></td><td>List all networks</td></tr>
+      <tr><td><code>docker network create &lt;name&gt;</code></td><td>Create a bridge network (default driver)</td></tr>
+      <tr><td><code>docker network create -d overlay &lt;name&gt;</code></td><td>Create an overlay network</td></tr>
+      <tr><td><code>docker network inspect &lt;name&gt;</code></td><td>Show network details (subnet, containers, config)</td></tr>
+      <tr><td><code>docker network connect &lt;net&gt; &lt;container&gt;</code></td><td>Attach a running container to a network</td></tr>
+      <tr><td><code>docker network disconnect &lt;net&gt; &lt;container&gt;</code></td><td>Detach a container from a network</td></tr>
+      <tr><td><code>docker network rm &lt;name&gt;</code></td><td>Remove a network (must have no containers)</td></tr>
+      <tr><td><code>docker network prune</code></td><td>Remove all unused networks</td></tr>
+      <tr><td><code>docker port &lt;container&gt;</code></td><td>Show port mappings for a container</td></tr>
+      <tr><td><code>docker inspect --format '...' &lt;ctr&gt;</code></td><td>Extract networking info from a container</td></tr>
+    </tbody>
+  </table>
+  <pre><code class="language-bash"># Useful inspect format strings
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' my-ctr
+docker inspect -f '{{json .NetworkSettings.Ports}}' my-ctr | jq .
+docker inspect -f '{{.NetworkSettings.Gateway}}' my-ctr</code></pre>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 15 — TROUBLESHOOTING ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">14</span>
+    <h2>Network Troubleshooting</h2>
+  </div>
+  <p>When containers cannot communicate, use these tools and techniques to diagnose the problem systematically.</p>
+  <div class="cols cols-2">
+    <div>
+      <div class="card blue">
+        <h3 class="b">The netshoot Toolkit</h3>
+        <p><code>nicolaka/netshoot</code> is a container packed with networking tools: curl, dig, nslookup, tcpdump, iperf, nmap, and more.</p>
+      </div>
+      <pre><code class="language-bash"># Attach netshoot to a network
+docker run --rm -it \
+  --network my-app \
+  nicolaka/netshoot
+
+# Debug from inside a container's namespace
+docker run --rm -it \
+  --network container:my-api \
+  nicolaka/netshoot
+
+# Capture traffic on docker0
+docker run --rm -it --net host \
+  nicolaka/netshoot \
+  tcpdump -i docker0 -nn port 80</code></pre>
+    </div>
+    <div>
+      <div class="card amber">
+        <h3 class="a">Troubleshooting Checklist</h3>
+        <ul>
+          <li>Are containers on the <strong>same network</strong>? Check with <code>docker network inspect</code></li>
+          <li>Is it a <strong>user-defined</strong> network? (DNS needs it)</li>
+          <li>Can you <strong>ping</strong> the target by IP? (rules out DNS)</li>
+          <li>Is the <strong>service listening</strong> on the right port and interface (<code>0.0.0.0</code> not <code>127.0.0.1</code>)?</li>
+          <li>Check <strong>iptables</strong> rules: <code>iptables -L -n -t nat</code></li>
+          <li>Check <strong>docker logs</strong> for connection errors</li>
+          <li>Verify <strong>firewall</strong> allows Docker-managed ports</li>
+        </ul>
+      </div>
+      <pre><code class="language-bash"># Quick diagnostics from host
+docker exec my-api cat /etc/resolv.conf
+docker exec my-api nslookup db
+docker exec my-api curl -v http://db:5432
+iptables -L DOCKER -n -v</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 16 — NETWORK PLUGINS ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">15</span>
+    <h2>Network Plugins &amp; CNI</h2>
+  </div>
+  <p>Docker supports third-party network plugins for advanced use cases. In Kubernetes, the <span class="p">Container Network Interface (CNI)</span> standard replaces Docker&rsquo;s built-in networking.</p>
+  <div class="cols cols-3">
+    <div class="card purple">
+      <h3 class="p">Calico</h3>
+      <ul>
+        <li>L3 routing with BGP</li>
+        <li>Advanced network policies</li>
+        <li>High performance at scale</li>
+        <li>Used in major K8s deployments</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <h3 class="b">Cilium</h3>
+      <ul>
+        <li>eBPF-based networking</li>
+        <li>L7 (HTTP/gRPC) policies</li>
+        <li>Transparent encryption</li>
+        <li>Observability with Hubble</li>
+      </ul>
+    </div>
+    <div class="card green">
+      <h3 class="g">Flannel</h3>
+      <ul>
+        <li>Simple overlay networking</li>
+        <li>VXLAN or host-gw backend</li>
+        <li>Minimal configuration</li>
+        <li>Good for small clusters</li>
+      </ul>
+    </div>
+  </div>
+  <div class="cols cols-2" style="margin-top:0.4em;">
+    <div class="card amber">
+      <h3 class="a">Weave Net</h3>
+      <ul>
+        <li>Mesh overlay with encryption</li>
+        <li>Automatic peer discovery</li>
+        <li>DNS-based service discovery</li>
+        <li>Multicast support</li>
+      </ul>
+    </div>
+    <div class="card red">
+      <h3 class="r">Docker Plugin API</h3>
+      <ul>
+        <li>Install: <code>docker plugin install &lt;name&gt;</code></li>
+        <li>Plugins implement the libnetwork remote driver API</li>
+        <li>Vendors: Infoblox, Contiv, Kuryr (OpenStack)</li>
+        <li>Moving toward CNI standard in most ecosystems</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 17 — PRODUCTION PATTERNS ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">16</span>
+    <h2>Production Networking Patterns</h2>
+  </div>
+  <div class="cols cols-2">
+    <div>
+      <div class="card amber">
+        <h3 class="a">Reverse Proxy Pattern</h3>
+        <ul>
+          <li>Traefik / Nginx / Caddy as edge proxy</li>
+          <li>Only proxy exposes ports to the host</li>
+          <li>Backend containers on internal networks</li>
+          <li>TLS termination at the proxy</li>
+          <li>Automatic service discovery via Docker labels</li>
+        </ul>
+      </div>
+      <div class="card green" style="margin-top:0.4em;">
+        <h3 class="g">Sidecar Pattern</h3>
+        <ul>
+          <li>Share network namespace: <code>--network container:main</code></li>
+          <li>Log shippers, metrics collectors, service mesh proxies</li>
+          <li>Containers communicate over <code>localhost</code></li>
+          <li>Used by Istio/Envoy, Datadog Agent</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <pre><code class="language-yaml"># Reverse proxy with Traefik
+services:
+  traefik:
+    image: traefik:v3.0
+    ports: ["80:80", "443:443"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [proxy]
+
+  api:
+    image: my-api:latest
+    labels:
+      - "traefik.http.routers.api.rule=Host(`api.example.com`)"
+    networks: [proxy, backend]
+
+  db:
+    image: postgres:16
+    networks: [backend]
+
+networks:
+  proxy:
+  backend:
+    internal: true</code></pre>
+      <pre><code class="language-bash"># Sidecar: envoy shares api's network
+docker run -d --name api my-api
+docker run -d --name envoy \
+  --network container:api \
+  envoyproxy/envoy</code></pre>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════ SLIDE 18 — SUMMARY ═══════════════════════════════ -->
+<section data-background-color="#0a0a0f">
+  <div class="slide-hdr">
+    <span class="tag">17</span>
+    <h2>Summary &amp; Further Reading</h2>
+  </div>
+  <div class="cols cols-2">
+    <div>
+      <div class="card green">
+        <h3 class="g">Key Takeaways</h3>
+        <ul>
+          <li><strong>Always</strong> use user-defined bridge networks over the default</li>
+          <li>Leverage Docker DNS &mdash; connect by name, not IP</li>
+          <li>Isolate tiers with separate networks and <code>--internal</code></li>
+          <li>Bind ports to <code>127.0.0.1</code> in development</li>
+          <li>Use overlay networks for multi-host deployments</li>
+          <li>Macvlan/IPvlan for direct LAN integration</li>
+          <li>Always consider Docker&rsquo;s iptables implications</li>
+        </ul>
+      </div>
+      <div class="card amber" style="margin-top:0.4em;">
+        <h3 class="a">Decision Flowchart</h3>
+        <ul>
+          <li>Single host, multiple containers? &rarr; <span class="g">User-defined bridge</span></li>
+          <li>Multi-host cluster? &rarr; <span class="p">Overlay</span></li>
+          <li>Need LAN IP? &rarr; <span class="b">Macvlan/IPvlan</span></li>
+          <li>Max performance? &rarr; <span class="a">Host</span></li>
+          <li>Total isolation? &rarr; <span class="r">None</span></li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card purple">
+        <h3 class="p">Further Reading</h3>
+        <ul>
+          <li><a href="https://docs.docker.com/network/" style="color:var(--blue);">Docker Networking Documentation</a></li>
+          <li><a href="https://docs.docker.com/engine/network/drivers/" style="color:var(--blue);">Network Driver Overview</a></li>
+          <li><a href="https://docs.docker.com/compose/networking/" style="color:var(--blue);">Networking in Compose</a></li>
+          <li><a href="https://github.com/nicolaka/netshoot" style="color:var(--blue);">netshoot: Docker Network Troubleshooting</a></li>
+          <li><a href="https://docs.docker.com/engine/network/packet-filtering-firewalls/" style="color:var(--blue);">Docker and iptables</a></li>
+        </ul>
+      </div>
+      <div class="card blue" style="margin-top:0.4em;">
+        <h3 class="b">Hands-On Exercises</h3>
+        <ul>
+          <li>Create a multi-tier app with isolated networks</li>
+          <li>Set up Traefik with automatic HTTPS</li>
+          <li>Debug connectivity with netshoot</li>
+          <li>Test overlay networking with Docker Swarm</li>
+          <li>Configure macvlan for LAN-accessible containers</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+<script>
+Reveal.initialize({
+  hash: true,
+  slideNumber: 'c/t',
+  transition: 'fade',
+  transitionSpeed: 'fast',
+  controls: true,
+  progress: true,
+  center: false,
+  width: 1100,
+  height: 900,
+  margin: 0.01,
+  plugins: [RevealHighlight],
+  highlight: { theme: 'monokai' }
+});
+</script>
+<script>
+(function(){
+  var h = Reveal.getConfig().height || 900;
+  var m = Reveal.getConfig().margin || 0.02;
+  var maxH = Math.floor(h * (1 - 2 * m)) + 'px';
+  function fixSlides(){
+    document.querySelectorAll('.reveal .slides>section,.reveal .slides>section>section').forEach(function(s){
+      s.style.display = 'block';
+      s.style.maxHeight = maxH;
+    });
+  }
+  Reveal.on('ready', fixSlides);
+  Reveal.on('slidechanged', fixSlides);
+})();
+</script>
+</body>
+</html>
