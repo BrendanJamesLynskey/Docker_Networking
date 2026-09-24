@@ -8,20 +8,20 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/white.min.css">
 <style>
   :root {
-    --amber:  #f5a623;
-    --green:  #4ecb8d;
-    --purple: #a78bfa;
-    --blue:   #60a5fa;
-    --red:    #f87171;
-    --bg:     #0a0a0f;
-    --bg2:    #10101a;
-    --bg3:    #181824;
-    --border: #2a2a3a;
-    --text:   #e8e8f0;
-    --muted:  #8888a8;
+    --amber:  #af7e0f;
+    --green:  #217566;
+    --purple: #4e4392;
+    --blue:   #204d89;
+    --red:    #bb2233;
+    --bg:     #eaeff2;
+    --bg2:    #e1e8ec;
+    --bg3:    #d9e1e6;
+    --border: #b9c7d0;
+    --text:   #14273b;
+    --muted:  #5c6e7b;
   }
 
   .reveal-viewport { background: var(--bg); }
@@ -37,7 +37,7 @@
   .reveal code { font-family: 'JetBrains Mono', monospace; font-size: .72em; }
   .reveal pre  { box-shadow: none; background: var(--bg3); border: 1px solid var(--border);
                  border-radius: 6px; padding: .3em .5em; margin: .25em 0; }
-  .reveal pre code { font-size: .52em; line-height: 1.35; background: transparent; color: #cdd6f4; }
+  .reveal pre code { font-size: .52em; line-height: 1.35; background: transparent; color: #213343; }
 
   .slide-hdr {
     display: flex; align-items: center; gap: .4em;
@@ -69,15 +69,15 @@
   .card.blue  { border-left: 3px solid var(--blue); }
   .card.red   { border-left: 3px solid var(--red); }
   .card h3 { font-size: .64em; margin: 0 0 .12em; }
-  .card p  { font-size: .52em; margin: 0; color: #b8b8d0; }
+  .card p  { font-size: .52em; margin: 0; color: #354552; }
   .card ul { margin: 0; padding-left: 1em; }
-  .card li { font-size: .52em; color: #b8b8d0; margin-bottom: .02em; }
+  .card li { font-size: .52em; color: #354552; margin-bottom: .02em; }
 
   .reveal table { width: 100%; border-collapse: collapse; font-size: .5em; }
   .reveal table th { background: var(--bg3); color: var(--amber); font-weight: 600;
                      padding: .2em .4em; border: 1px solid var(--border); text-align: left; }
-  .reveal table td { padding: .18em .4em; border: 1px solid var(--border); color: #ccc; }
-  .reveal table tr:nth-child(even) td { background: #0e0e18; }
+  .reveal table td { padding: .18em .4em; border: 1px solid var(--border); color: #283948; }
+  .reveal table tr:nth-child(even) td { background: #e3eaee; }
 
   .a  { color: var(--amber); font-weight: 600; }
   .g  { color: var(--green); font-weight: 600; }
@@ -114,14 +114,15 @@
     padding: .2em .55em; border-radius: 5px; font-size: .9em;
     background: var(--bg3); border: 1px solid var(--border); color: var(--text);
   }
-  .ss-node.active { background: #1a2a1a; border-color: var(--green); color: var(--green); }
-  .ss-node.done   { background: #1a1a2a; border-color: var(--purple); color: var(--purple); }
+  .ss-node.active { background: #c4d4d1; border-color: var(--green); color: var(--green); }
+  .ss-node.done   { background: #d4dde4; border-color: var(--purple); color: var(--purple); }
   .ss-arrow { color: var(--amber); }
   .ss-label { font-size: .8em; color: var(--muted); margin-left: .3em; }
 
   .reveal ul, .reveal ol { margin: .15em 0 .15em 1em; }
   .reveal .slides > section { display: flex !important; flex-direction: column !important; overflow-y: auto !important; align-items: stretch !important; justify-content: flex-start !important; }
 </style>
+<style>.reveal .slide-number{background-color:transparent}</style>
 </head>
 <body>
 <div class="reveal">
@@ -129,7 +130,7 @@
 
 
 <!-- ═══════════════════════════════ SLIDE 01 — TITLE ═══════════════════════════════ -->
-<section class="title-slide" data-background-color="#0a0a0f">
+<section class="title-slide" data-background-color="#eaeff2">
   <div style="text-align:left; max-width:820px; margin:0 auto; padding: 1em 0;">
     <div style="font-family:'JetBrains Mono',monospace; font-size:.5em; color:var(--muted); margin-bottom:.4em; letter-spacing:.1em;">
       TECHNICAL PRESENTATION
@@ -154,7 +155,7 @@
       <span class="ss-arrow">&rarr;</span>
       <span class="ss-node done">Host NIC</span>
     </div>
-    <p style="max-width:620px; color:#a0a0c0; font-size:.56em; line-height:1.5; margin-top:1em;">
+    <p style="max-width:620px; color:#475865; font-size:.56em; line-height:1.5; margin-top:1em;">
       Understanding how Docker containers communicate &mdash; with each other, the host, and the outside world &mdash; through bridges, overlays, DNS, and network policies.
     </p>
     <div class="meta" style="margin-top:1.4em;">
@@ -165,7 +166,7 @@
 
 
 <!-- ═══════════════════════════════ SLIDE 02 — TOPICS ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">01</span>
     <h2>Topics</h2>
@@ -216,7 +217,7 @@
 
 
 <!-- ═══════════════════════════════ SLIDE 03 — NETWORKING OVERVIEW ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">02</span>
     <h2>Docker Networking Overview</h2>
@@ -259,7 +260,7 @@ docker network ls
 
 
 <!-- ═══════════════════════════════ SLIDE 04 — DEFAULT BRIDGE ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">03</span>
     <h2>Default Bridge Network</h2>
@@ -316,7 +317,7 @@ brctl show docker0
 
 
 <!-- ═══════════════════════════════ SLIDE 05 — USER-DEFINED BRIDGE ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">04</span>
     <h2>User-Defined Bridge Networks</h2>
@@ -382,7 +383,7 @@ docker network create \
 
 
 <!-- ═══════════════════════════════ SLIDE 06 — HOST NETWORKING ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">05</span>
     <h2>Host Networking</h2>
@@ -435,7 +436,7 @@ services:
 
 
 <!-- ═══════════════════════════════ SLIDE 07 — OVERLAY NETWORKS ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">06</span>
     <h2>Overlay Networks</h2>
@@ -497,7 +498,7 @@ docker run -d --network my-overlay \
 
 
 <!-- ═══════════════════════════════ SLIDE 08 — MACVLAN & IPVLAN ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">07</span>
     <h2>Macvlan &amp; IPvlan Drivers</h2>
@@ -558,7 +559,7 @@ docker network create -d ipvlan \
 
 
 <!-- ═══════════════════════════════ SLIDE 09 — NETWORK DRIVER COMPARISON ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">08</span>
     <h2>Network Driver Comparison</h2>
@@ -640,7 +641,7 @@ docker network create -d ipvlan \
 
 
 <!-- ═══════════════════════════════ SLIDE 10 — DNS RESOLUTION ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">09</span>
     <h2>DNS Resolution in Docker</h2>
@@ -703,7 +704,7 @@ docker run -d \
 
 
 <!-- ═══════════════════════════════ SLIDE 11 — PORT MAPPING ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">10</span>
     <h2>Port Mapping &amp; Publishing</h2>
@@ -761,7 +762,7 @@ services:
 
 
 <!-- ═══════════════════════════════ SLIDE 12 — CONTAINER-TO-CONTAINER ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">11</span>
     <h2>Container-to-Container Communication</h2>
@@ -826,7 +827,7 @@ networks:
 
 
 <!-- ═══════════════════════════════ SLIDE 13 — NETWORK ISOLATION ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">12</span>
     <h2>Network Isolation &amp; Security</h2>
@@ -881,7 +882,7 @@ docker network create --driver overlay \
 
 
 <!-- ═══════════════════════════════ SLIDE 14 — NETWORK COMMANDS ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">13</span>
     <h2>Network Commands Cheat Sheet</h2>
@@ -911,7 +912,7 @@ docker inspect -f '{{.NetworkSettings.Gateway}}' my-ctr</code></pre>
 
 
 <!-- ═══════════════════════════════ SLIDE 15 — TROUBLESHOOTING ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">14</span>
     <h2>Network Troubleshooting</h2>
@@ -962,7 +963,7 @@ iptables -L DOCKER -n -v</code></pre>
 
 
 <!-- ═══════════════════════════════ SLIDE 16 — NETWORK PLUGINS ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">15</span>
     <h2>Network Plugins &amp; CNI</h2>
@@ -1021,7 +1022,7 @@ iptables -L DOCKER -n -v</code></pre>
 
 
 <!-- ═══════════════════════════════ SLIDE 17 — PRODUCTION PATTERNS ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">16</span>
     <h2>Production Networking Patterns</h2>
@@ -1083,7 +1084,7 @@ docker run -d --name envoy \
 
 
 <!-- ═══════════════════════════════ SLIDE 18 — SUMMARY ═══════════════════════════════ -->
-<section data-background-color="#0a0a0f">
+<section data-background-color="#eaeff2">
   <div class="slide-hdr">
     <span class="tag">17</span>
     <h2>Summary &amp; Further Reading</h2>
@@ -1144,7 +1145,7 @@ docker run -d --name envoy \
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/highlight.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/plugin/highlight/monokai.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-light.min.css">
 <script>
 Reveal.initialize({
   hash: true,
